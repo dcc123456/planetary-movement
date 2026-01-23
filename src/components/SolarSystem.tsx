@@ -136,10 +136,16 @@ export const SolarSystem: React.FC<SolarSystemProps> = ({
     const stars = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(stars);
 
+    // 创建纹理加载器
+    const textureLoader = new THREE.TextureLoader();
+
     // 创建太阳
     const sunGeometry = new THREE.SphereGeometry(20, 32, 32);
+    const sunTexture = textureLoader.load(
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg/1024px-The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg",
+    );
     const sunMaterial = new THREE.MeshPhongMaterial({
-      color: 0xffff00,
+      map: sunTexture,
       emissive: 0xffff00,
       emissiveIntensity: 0.5,
       shininess: 10,
@@ -148,18 +154,32 @@ export const SolarSystem: React.FC<SolarSystemProps> = ({
     const sun = new THREE.Mesh(sunGeometry, sunMaterial);
     scene.add(sun);
 
-    // 创建太阳光
-    const pointLight = new THREE.PointLight(0xffff00, 2, 10000);
+    // 创建太阳光 - 增加强度使星球更明亮
+    const pointLight = new THREE.PointLight(0xffff00, 5, 10000);
     scene.add(pointLight);
 
-    // 添加环境光
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    // 添加环境光 - 增加强度使星球更明亮
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     scene.add(ambientLight);
 
     // 创建行星和轨道
     planetsRef.current = [];
     planetDataRef.current = planets;
     orbitAngleRef.current = planets.map(() => Math.random() * Math.PI * 2);
+
+    // 行星纹理映射 - 使用中文键名匹配行星数据
+    const planetTextures: Record<string, string> = {
+      水星: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Mercury_in_color_-_Prockter07_centered.jpg/800px-Mercury_in_color_-_Prockter07_centered.jpg",
+      金星: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Venus-real_color.jpg/800px-Venus-real_color.jpg",
+      地球: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/800px-The_Earth_seen_from_Apollo_17.jpg",
+      火星: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/OSIRIS_Mars_true_color.jpg/800px-OSIRIS_Mars_true_color.jpg",
+      木星: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Jupiter_and_its_shrunken_Great_Red_Spot.jpg/800px-Jupiter_and_its_shrunken_Great_Red_Spot.jpg",
+      土星: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Saturn_during_Equinox.jpg/800px-Saturn_during_Equinox.jpg",
+      天王星:
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Uranus2.jpg/800px-Uranus2.jpg",
+      海王星:
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Neptune_Full.jpg/800px-Neptune_Full.jpg",
+    };
 
     planets.forEach((planet, index) => {
       // 创建轨道
@@ -192,17 +212,30 @@ export const SolarSystem: React.FC<SolarSystemProps> = ({
 
       // 创建行星 - 大幅增大行星尺寸，确保可见
       const planetGeometry = new THREE.SphereGeometry(
-        planet.radius * 10, // 增大20倍，使行星更明显
-        16, // 减少细分级别，提高性能
-        16, // 减少细分级别，提高性能
+        planet.radius * 1, // 增大20倍，使行星更明显
+        32, // 增加细分级别，使纹理更平滑
+        32, // 增加细分级别，使纹理更平滑
       );
 
-      // 使用Wireframe材质使旋转更明显
+      // 加载行星纹理
+      const textureUrl = planetTextures[planet.name] || "";
+      const planetTexture = textureLoader.load(
+        textureUrl,
+        () => console.log(`成功加载${planet.name}纹理`),
+        undefined,
+        (error) => {
+          console.error(`加载${planet.name}纹理失败:`, error);
+        },
+      );
+
+      // 创建行星材质 - 增强亮度和反光效果
       const planetMaterial = new THREE.MeshPhongMaterial({
+        map: planetTexture,
         color: planet.color,
-        shininess: 30,
-        specular: 0x333333,
-        wireframe: true, // 使用线框模式，使旋转更明显
+        shininess: 80, // 增加反光度
+        specular: 0xffffff, // 增强高光颜色
+        wireframe: false, // 关闭线框模式，显示纹理
+        side: THREE.DoubleSide, // 确保两面都能看到
       });
 
       const planetMesh = new THREE.Mesh(planetGeometry, planetMaterial);
@@ -287,7 +320,7 @@ export const SolarSystem: React.FC<SolarSystemProps> = ({
 
         // 行星公转 - 使用delta time确保动画速度一致
         orbitAngleRef.current[index] +=
-          0.5 * orbitSpeedRef.current * clampedDelta * 0.6; // *60 确保60fps时速度一致
+          0.5 * orbitSpeedRef.current * clampedDelta * 0.2; // *60 确保60fps时速度一致
         const orbitRadius = (planet.distance * 2) / 10; // 除以10，缩小轨道半径
         planetMesh.position.x =
           Math.cos(orbitAngleRef.current[index]) * orbitRadius;
@@ -296,7 +329,7 @@ export const SolarSystem: React.FC<SolarSystemProps> = ({
 
         // 行星自转 - 使用delta time确保动画速度一致
         planetMesh.rotation.y +=
-          1.0 * rotationSpeedRef.current * clampedDelta * 60; // *60 确保60fps时速度一致
+          1.0 * rotationSpeedRef.current * clampedDelta * 0.2; // *60 确保60fps时速度一致
       });
 
       if (controlsRef.current) {
